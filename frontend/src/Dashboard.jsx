@@ -85,7 +85,7 @@ function Dashboard() {
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M2 10L10 2L18 10V17H12V13H8V17H2V10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
-              <span>Dashboard v1.0.3</span>
+              <span>Dashboard v1.0.4</span>
             </a>
             <a href="#community" className={`nav-item ${activeTab === 'community' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('community'); }}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
