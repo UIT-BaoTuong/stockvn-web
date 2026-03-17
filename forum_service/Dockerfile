@@ -14,4 +14,4 @@ WORKDIR /app
 COPY --from=build /app/build/libs/*.jar app.jar
 # Mở cổng 8080 (như cấu hình trong properties)
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]   
+ENTRYPOINT ["java", "-jar", "app.jar"]    
