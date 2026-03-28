@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const AUTH_BASE_URL = 'http://localhost:8080';
-const FORUM_BASE_URL = 'http://localhost:8081';
+const AUTH_BASE_URL = '/api/auth'; 
+const FORUM_BASE_URL = '/api/forum';
 
 export const resolveAuthAssetUrl = (url) => {
   if (!url) {
