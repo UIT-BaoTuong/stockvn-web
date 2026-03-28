@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: docker.io/tuongndb1609/auth_service:latest
+          image: docker.io/tuongndb1609/auth-service:v2
           ports:
             - containerPort: 8080
           env:
