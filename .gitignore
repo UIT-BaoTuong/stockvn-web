@@ -10,5 +10,7 @@ postgres/auth_data/
 # IDE files
 .vscode/
 .idea/
-kubernetes/postgres/auth_db/secret-auth.yaml
-kubernetes/postgres/forum_db/secret-forum.yaml
+secret-auth.yaml
+secret-forum.yaml
+seal-secret-auth.yaml 
+seal-secret-forum.yaml
