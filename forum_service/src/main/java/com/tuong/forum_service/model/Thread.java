@@ -18,8 +18,11 @@ public class Thread {
     @Column(nullable = false)
     private String title;
 
+    @Column(name = "user_name")
+    private String userName;
+
     @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    private UUID legacyUserId;
 
     // Nhiều Thread thuộc về 1 Category
     @ManyToOne
@@ -27,7 +30,7 @@ public class Thread {
     private Category category;
 
     // Một Thread có nhiều Posts (bình luận)
-    @OneToMany(mappedBy = "thread", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "thread", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Post> posts;
 
     private int viewCount = 0;

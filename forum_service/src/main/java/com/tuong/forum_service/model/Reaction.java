@@ -16,8 +16,11 @@ public class Reaction {
     @Column(nullable = false)
     private String type; // LIKE, LOVE, WOW, etc.
 
+    @Column(name = "user_name")
+    private String userName;
+
     @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    private UUID legacyUserId;
 
     // Nhiều Reaction thuộc về 1 Post
     @ManyToOne
