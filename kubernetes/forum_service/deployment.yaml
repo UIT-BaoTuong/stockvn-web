@@ -22,17 +22,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: forum-secret
-                  key: DB_URL
+                  key: DATABASE_URL
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: forum-secret
-                  key: DB_USERNAME
+                  key: DATABASE_USERNAME
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: forum-secret
-                  key: DB_PASSWORD
+                  key: DATABASE_PASSWORD
           ports:
             - containerPort: 8080
           resources:
