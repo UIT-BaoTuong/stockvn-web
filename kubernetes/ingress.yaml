@@ -28,6 +28,7 @@ metadata:
   name: multi-app-ingress
   namespace: monitoring
   annotations:
+    nginx.ingress.kubernetes.io/ssl-ignore-invalid-proxy-errors: "true"
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
