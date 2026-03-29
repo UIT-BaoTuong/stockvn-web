@@ -1,0 +1,73 @@
+# --- PHẦN 1: CẦU NỐI (EXTERNALNAME) ---
+# Giúp namespace 'monitoring' có thể gọi được Service ở namespace khác
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-bridge
+  namespace: monitoring
+spec:
+  type: ExternalName
+  externalName: frontend.default.svc.cluster.local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-bridge
+  namespace: monitoring
+spec:
+  type: ExternalName
+  externalName: argocd-server.argocd.svc.cluster.local
+
+---
+# --- PHẦN 2: INGRESS DUY NHẤT ---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: multi-app-ingress
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    # Thêm dòng này để ArgoCD không bị lỗi redirect loop
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  tls:
+  - hosts:
+    - stockvn.online
+    - monitor.stockvn.online
+    - cd.stockvn.online
+    secretName: stockvn-tls-secret
+  rules:
+  - host: stockvn.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-bridge # Dùng cầu nối vừa tạo ở trên
+            port:
+              number: 80
+  - host: monitor.stockvn.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: monitoring-stack-grafana # Cái này cùng namespace nên gọi trực tiếp
+            port:
+              number: 80
+  - host: cd.stockvn.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-bridge # Dùng cầu nối vừa tạo ở trên
+            port:
+              number: 80
