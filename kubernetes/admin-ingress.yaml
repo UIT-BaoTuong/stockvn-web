@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: admin-ingress
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Cấu hình đặc biệt cho ArgoCD (Vì nó chạy HTTPS nội bộ)
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    # Bỏ qua kiểm tra chứng chỉ nội bộ của ArgoCD
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "false"
+spec:
+  tls:
+  - hosts:
+    - cd.stockvn.online
+    - monitor.stockvn.online
+    # Tạm dùng chung secret này, trình duyệt sẽ báo đỏ nhưng vẫn cho vào
+    secretName: stockvn-tls-secret 
+  rules:
+  - host: cd.stockvn.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-bridge
+            port:
+              number: 443
+  - host: monitor.stockvn.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: monitoring-stack-grafana
+            port:
+              number: 80
