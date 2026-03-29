@@ -16,10 +16,9 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: docker.io/tuongndb1609/frontend:v3
+          image: docker.io/tuongndb1609/frontend:v4
           ports:
             - containerPort: 80
-            - containerPort: 443 # <-- Mở thêm cổng HTTPS
           resources:
             requests:
               memory: "256Mi"
@@ -27,11 +26,3 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "1"
-          volumeMounts:
-            - name: certs-volume
-              mountPath: "/etc/nginx/certs" # <-- Nơi Nginx sẽ tìm thấy file cert
-              readOnly: true
-      volumes:
-        - name: certs-volume
-          secret:
-            secretName: stockvn-tls-secret # <-- Tên Secret bạn vừa tạo thành công
