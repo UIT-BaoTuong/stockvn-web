@@ -8,4 +8,4 @@ resources:
 images:
 - name: docker.io/tuongndb1609/auth-service
   newName: docker.io/tuongndb1609/auth-service
-  newTag: 1c691970d8d1b38124b4dc19eeef9fd4ee24861d
+  newTag: cb22e9762865c978f9a6d57d9c7a448d9aecdfc4
