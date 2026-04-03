@@ -18,6 +18,7 @@
 ## CI/CD Flow
 
 This diagram represents the full infrastructure + CI/CD + delivery workflow:
+<img width="721" height="501" alt="Image" src="https://github.com/user-attachments/assets/0f0eb8bb-a7e6-4711-a6f2-f4afbc6adf57" />
 
 ### Infrastructure bootstrap (top layer)
 1. Terraform provisions cloud infrastructure on Azure.
@@ -37,7 +38,7 @@ This diagram represents the full infrastructure + CI/CD + delivery workflow:
 10. End users access the application through domain endpoints.
 11. Prometheus monitors Kubernetes workloads and cluster metrics.
 
-<img width="721" height="501" alt="Image" src="https://github.com/user-attachments/assets/0f0eb8bb-a7e6-4711-a6f2-f4afbc6adf57" />
+
 
 ## Pipeline Strengths
 - End-to-end automation from source commit to Kubernetes deployment.
