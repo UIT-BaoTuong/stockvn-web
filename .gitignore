@@ -20,3 +20,4 @@ seal-secret-forum.yaml
 
 # 2. Loại trừ (Cho phép) tất cả các thư mục ở gốc
 !/*/
+!/readme.md
