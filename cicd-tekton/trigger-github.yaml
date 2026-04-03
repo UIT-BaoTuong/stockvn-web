@@ -1,0 +1,125 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: trigger-binding-github
+spec:
+  params:
+    - name: url
+      value: $(body.repository.clone_url)
+    - name: branch
+      value: $(body.ref)
+    - name: revision
+      value: $(body.after)
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: trigger-template-github
+spec:
+  params:
+    - name: url
+    - name: branch
+    - name: revision
+    - name: folders
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: $(tt.params.folders)-run-
+      spec:
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+          - name: docker-config
+            secret:
+              secretName: secret-account
+        pipelineRef:
+          name: pipeline-dev
+        params:
+          - name: url
+            value: "$(tt.params.url)"
+          - name: branch
+            value: "$(tt.params.branch)"
+          - name: revision
+            value: "$(tt.params.revision)"
+          - name: folders
+            value: "$(tt.params.folders)"
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: event-listener-github
+spec:
+  resources:
+    kubernetesResource:
+      serviceType: ClusterIP
+  serviceAccountName: service-account-trigger
+  triggers:
+    - name: trigger-auth
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "secretRef"
+              value:
+                secretName: github-webhook-secret
+                secretKey: token
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "body.commits.map(c, c.added + c.modified + c.removed).flatten().exists(f, f.startsWith('auth-service/'))"
+      bindings:
+        - ref: trigger-binding-github
+        - name: folders
+          value: "auth-service"
+      template:
+        ref: trigger-template-github
+
+    - name: trigger-forum
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "secretRef"
+              value:
+                secretName: github-webhook-secret
+                secretKey: token
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "body.commits.map(c, c.added + c.modified + c.removed).flatten().exists(f, f.startsWith('forum-service/'))"
+      bindings:
+        - ref: trigger-binding-github
+        - name: folders
+          value: "forum-service"
+      template:
+        ref: trigger-template-github
+
+    - name: trigger-frontend
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "secretRef"
+              value:
+                secretName: github-webhook-secret
+                secretKey: token
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "body.commits.map(c, c.added + c.modified + c.removed).flatten().exists(f, f.startsWith('frontend/'))"
+      bindings:
+        - ref: trigger-binding-github
+        - name: folders
+          value: "frontend"
+      template:
+        ref: trigger-template-github

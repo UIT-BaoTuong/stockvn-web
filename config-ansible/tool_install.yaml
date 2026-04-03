@@ -1,0 +1,74 @@
+- name: Install Tekton
+  hosts: local
+  vars:
+    tekton_version: "v0.67.0"
+  tasks:
+    - name: Install Tekton Pipelines
+      kubernetes.core.k8s:
+        state: present
+        src: https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+    - name: Install Tekton Triggers
+      kubernetes.core.k8s:
+        state: present
+        src: https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
+    - name: Install Tekton Interpreters
+      shell: |
+        kubectl apply -f https://infra.tekton.dev/tekton-releases/triggers/previous/v0.35.0/interceptors.yaml
+    - name: Install Sealed Secrets
+      shell: |
+        kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.21.0/controller.yaml
+    - name: Install ArgoCD
+      shell: |
+        kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+        kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    - name: Thêm kho lưu trữ Prometheus 
+      kubernetes.core.helm_repository:
+        name: prometheus-community
+        repo_url: "https://prometheus-community.github.io/helm-charts"
+
+    - name: Cập nhật lại danh sách chart 
+      shell: helm repo update 
+
+    - name: Cài đặt Prometheus & Grafana Stack
+      kubernetes.core.helm:
+        name: monitoring-stack
+        chart_ref: prometheus-community/kube-prometheus-stack
+        release_namespace: monitoring
+        create_namespace: true
+        values:
+          prometheus:
+            prometheusSpec:
+              retention: 10d  
+          grafana:
+            adminPassword: "Aa123456" 
+            service:
+              type: ClusterIP
+
+    - name: Thêm kho lưu trữ Ingress Nginx
+      kubernetes.core.helm_repository:
+        name: ingress-nginx
+        repo_url: "https://kubernetes.github.io/ingress-nginx"
+
+    - name: Cập nhật lại danh sách chart
+      shell: helm repo update
+
+    - name: Cài đặt Ingress Controller (Cổng chung duy nhất)
+      kubernetes.core.helm:
+        name: ingress-nginx
+        chart_ref: ingress-nginx/ingress-nginx
+        release_namespace: ingress-nginx
+        create_namespace: true
+    - name: Cài đặt Tekton Dashboard
+      kubernetes.core.k8s:
+        state: present
+        src: https://storage.googleapis.com/tekton-releases/dashboard/latest/release.yaml
+    - name: Thêm repo Bitnami vào Helm
+      kubernetes.core.helm_repository:
+        name: bitnami
+        repo_url: "https://charts.bitnami.com/bitnami"
+    - name: Cài đặt Matomo bằng Helm 
+      kubernetes.core.helm:
+        name: my-matomo
+        chart_ref: bitnami/matomo
+        release_namespace: matomo
+        create_namespace: true

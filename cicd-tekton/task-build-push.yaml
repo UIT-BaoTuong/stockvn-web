@@ -1,0 +1,42 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: task-build-push
+spec:
+  workspaces:
+    - name: source
+    - name: docker-config
+  params:
+    - name: url
+      description: The URL of the GitHub repository
+    - name: branch
+      description: The branch to trigger the pipeline on
+    - name: revision
+      description: The revision to trigger the pipeline on
+    - name: folders
+      description: Service name passed from the trigger, for example auth-service
+  steps:
+    - name: build-push
+      workingDir: $(workspaces.source.path)
+      image: moby/buildkit:master-rootless
+      securityContext:
+        privileged: true
+        allowPrivilegeEscalation: true 
+        runAsUser: 1000
+        runAsGroup: 1000
+      env:
+        - name: BUILDKIT_ADDR
+          value: unix:///run/user/1000/buildkit/buildkitd.sock
+        - name: DOCKER_CONFIG 
+          value: /tekton/home/.docker
+      script: |
+        service_dir="$(params.folders)"
+        mkdir -p /tekton/home/.docker
+        cp $(workspaces.docker-config.path)/.dockerconfigjson /tekton/home/.docker/config.json
+        rootlesskit buildkitd &
+        echo "Thư mục hiện tại:"
+        pwd
+        ls -F
+        echo "Building service directory: ${service_dir}"
+        sleep 5
+        buildctl build --frontend=dockerfile.v0 --local context="./${service_dir}" --local dockerfile="./${service_dir}" --output type=image,name="docker.io/tuongndb1609/${service_dir}:$(params.revision)",push=true
