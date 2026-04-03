@@ -31,4 +31,4 @@ COPY --from=build /app/build/libs/*.jar app.jar
 # Port mặc định của Forum Service thường là 8081 hoặc 8080 tùy bạn config
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "app.jar"]  
+ENTRYPOINT ["java", "-jar", "app.jar"]   
