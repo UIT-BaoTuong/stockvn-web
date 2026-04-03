@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: forum-service
-          image: docker.io/tuongndb1609/forum-service:v3
+          image: docker.io/tuongndb1609/forum-service:latest
           env:
             - name: SPRING_DATASOURCE_URL
               valueFrom:

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: docker.io/tuongndb1609/frontend:v4
+          image: docker.io/tuongndb1609/frontend:latest
           ports:
             - containerPort: 80
           resources:
