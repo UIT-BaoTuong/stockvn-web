@@ -6,3 +6,5 @@ resources:
   - forum-service
   - frontend
   - postgres
+  - ingress.yaml      
+  - admin-ingress.yaml
