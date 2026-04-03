@@ -1,327 +1,395 @@
-import { useState, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  BarChart3,
+  LogOut,
+  MessageCircle,
+  MoonStar,
+  Sparkles,
+  TrendingUp,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from './api';
-import './Dashboard.css';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { authClient, forumClient } from './api';
+
+const REACTION_TYPES = ['LIKE', 'BULLISH', 'BEARISH', 'WOW', 'INSIGHTFUL'];
+
+const parseErrorMessage = (error, fallback) => {
+  return error?.response?.data?.message || error?.message || fallback;
+};
 
 function Dashboard() {
   const navigate = useNavigate();
-  const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const queryClient = useQueryClient();
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedThreadId, setSelectedThreadId] = useState(null);
+  const [newCategory, setNewCategory] = useState({ name: '', description: '' });
+  const [newThreadTitle, setNewThreadTitle] = useState('');
+  const [newComment, setNewComment] = useState('');
+
+  const profileQuery = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      const response = await authClient.profile();
+      return response.data;
+    },
+  });
+
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await forumClient.getCategories();
+      return response.data || [];
+    },
+  });
+
+  const threadsQuery = useQuery({
+    queryKey: ['threads', selectedCategoryId],
+    enabled: Boolean(selectedCategoryId),
+    queryFn: async () => {
+      const response = await forumClient.getThreadsByCategory(selectedCategoryId);
+      return response.data || [];
+    },
+  });
+
+  const postsQueryKey = ['posts', selectedThreadId];
+  const postsQuery = useQuery({
+    queryKey: postsQueryKey,
+    enabled: Boolean(selectedThreadId),
+    queryFn: async () => {
+      const response = await forumClient.getPostsByThread(selectedThreadId);
+      return response.data || [];
+    },
+  });
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem('accessToken');
-        const response = await api.get('/auth/profile', {
-          headers: {
-            Authorization: `Bearer ${token}`
+    if (profileQuery.isError) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      toast.error('Phiên đăng nhập đã hết hạn.');
+      navigate('/login');
+    }
+  }, [navigate, profileQuery.isError]);
+
+  useEffect(() => {
+    const categories = categoriesQuery.data || [];
+    if (!categories.length) {
+      setSelectedCategoryId(null);
+      setSelectedThreadId(null);
+      return;
+    }
+
+    if (!selectedCategoryId || !categories.some((item) => item.id === selectedCategoryId)) {
+      setSelectedCategoryId(categories[0].id);
+      setSelectedThreadId(null);
+    }
+  }, [categoriesQuery.data, selectedCategoryId]);
+
+  useEffect(() => {
+    const threads = threadsQuery.data || [];
+    if (!threads.length) {
+      setSelectedThreadId(null);
+      return;
+    }
+
+    if (!selectedThreadId || !threads.some((item) => item.id === selectedThreadId)) {
+      setSelectedThreadId(threads[0].id);
+    }
+  }, [threadsQuery.data, selectedThreadId]);
+
+  const createCategoryMutation = useMutation({
+    mutationFn: (payload) => forumClient.createCategory(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+      toast.success('Đã tạo category mới');
+      setNewCategory({ name: '', description: '' });
+    },
+    onError: (error) => {
+      toast.error(parseErrorMessage(error, 'Không tạo được category'));
+    },
+  });
+
+  const createThreadMutation = useMutation({
+    mutationFn: (payload) => forumClient.createThread(selectedCategoryId, payload),
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: ['threads', selectedCategoryId] });
+      setSelectedThreadId(response?.data?.id || null);
+      setNewThreadTitle('');
+      toast.success('Topic đã được tạo');
+    },
+    onError: (error) => {
+      toast.error(parseErrorMessage(error, 'Không tạo được thread'));
+    },
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: (payload) => forumClient.createPost(selectedThreadId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: postsQueryKey });
+      setNewComment('');
+      toast.success('Đã gửi bình luận');
+    },
+    onError: (error) => {
+      toast.error(parseErrorMessage(error, 'Không gửi được bình luận'));
+    },
+  });
+
+  const increaseViewMutation = useMutation({
+    mutationFn: (threadId) => forumClient.increaseThreadView(threadId),
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['threads', selectedCategoryId] });
+    },
+  });
+
+  const reactMutation = useMutation({
+    mutationFn: ({ postId, type }) => forumClient.createOrUpdateReaction(postId, { type, userName: forumUserName }),
+    onMutate: async ({ postId, type }) => {
+      await queryClient.cancelQueries({ queryKey: postsQueryKey });
+      const previousPosts = queryClient.getQueryData(postsQueryKey);
+
+      queryClient.setQueryData(postsQueryKey, (oldPosts = []) => {
+        return oldPosts.map((post) => {
+          if (post.id !== postId) {
+            return post;
           }
+
+          const reactions = Array.isArray(post.reactions) ? [...post.reactions] : [];
+          const existingIndex = reactions.findIndex((item) => item.userName === forumUserName);
+          if (existingIndex >= 0) {
+            reactions[existingIndex] = { ...reactions[existingIndex], type };
+          } else {
+            reactions.push({ id: `optimistic-${Date.now()}`, userName: forumUserName, type });
+          }
+
+          return { ...post, reactions };
         });
-        setUserProfile(response.data);
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        localStorage.removeItem('accessToken');
-        navigate('/login');
-      } finally {
-        setLoading(false);
+      });
+
+      return { previousPosts };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousPosts) {
+        queryClient.setQueryData(postsQueryKey, context.previousPosts);
       }
-    };
+      toast.error(parseErrorMessage(error, 'Không gửi được reaction'));
+    },
+    onSuccess: () => {
+      toast.success('Reaction đã cập nhật');
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: postsQueryKey });
+    },
+  });
 
-    fetchProfile();
-  }, [navigate]);
+  const handleLogout = async () => {
+    try {
+      await authClient.logout();
+    } catch (_error) {
+      // Keep UX smooth even if backend logout fails.
+    }
 
-  const handleLogout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    toast.success('Đã đăng xuất');
     navigate('/login');
   };
 
-  const navigateTo = (path) => {
-    navigate(path);
+  const groupedReaction = (post) => {
+    const source = post?.reactions || [];
+    return source.reduce((acc, item) => {
+      acc[item.type] = (acc[item.type] || 0) + 1;
+      return acc;
+    }, {});
   };
 
-  if (loading) {
+  const categories = categoriesQuery.data || [];
+  const threads = threadsQuery.data || [];
+  const posts = postsQuery.data || [];
+  const selectedCategory = categories.find((item) => item.id === selectedCategoryId);
+  const selectedThread = threads.find((item) => item.id === selectedThreadId);
+  const forumUserName = profileQuery.data?.username || '';
+
+  const loadingInitial = profileQuery.isLoading || categoriesQuery.isLoading;
+
+  if (loadingInitial) {
     return (
-      <div className="dashboard-container">
-        <div className="loading-screen">
-          <div className="loader-circle"></div>
-          <p>Đang khởi tạo</p>
+      <div className="loading-screen">
+        <div className="skeleton skeleton-banner"></div>
+        <div className="skeleton-grid">
+          <div className="skeleton skeleton-col"></div>
+          <div className="skeleton skeleton-col"></div>
+          <div className="skeleton skeleton-col"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Sidebar Navigation */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <div className="logo">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect x="2" y="2" width="10" height="10" stroke="url(#gradient1)" strokeWidth="1.5" rx="2"/>
-              <rect x="16" y="2" width="10" height="10" stroke="url(#gradient2)" strokeWidth="1.5" rx="2"/>
-              <rect x="2" y="16" width="10" height="10" stroke="url(#gradient2)" strokeWidth="1.5" rx="2"/>
-              <rect x="16" y="16" width="10" height="10" stroke="url(#gradient1)" strokeWidth="1.5" rx="2"/>
-              <defs>
-                <linearGradient id="gradient1" x1="0" y1="0" x2="12" y2="12">
-                  <stop offset="0%" stopColor="#00D9FF"/>
-                  <stop offset="100%" stopColor="#B26FFF"/>
-                </linearGradient>
-                <linearGradient id="gradient2" x1="0" y1="0" x2="12" y2="12">
-                  <stop offset="0%" stopColor="#B26FFF"/>
-                  <stop offset="100%" stopColor="#00D9FF"/>
-                </linearGradient>
-              </defs>
-            </svg>
-            <span>Xenforo</span>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <div className="nav-section">
-            <p className="nav-label">CHÍNH</p>
-            <a href="#overview" className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('overview'); }}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M2 10L10 2L18 10V17H12V13H8V17H2V10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <span>Dashboard</span>
-            </a>
-            <a href="#community" className={`nav-item ${activeTab === 'community' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('community'); }}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <circle cx="7" cy="5" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                <circle cx="13" cy="5" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M3 10C3 8 5 7 7 7C9 7 11 8 11 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M9 10C9 8 11 7 13 7C15 7 17 8 17 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M2 18C2 15 4 13 10 13C16 13 18 15 18 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <span>Cộng đồng</span>
-            </a>
-            <a href="#posts" className={`nav-item ${activeTab === 'posts' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('posts'); }}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M3 2H17C18.1046 2 19 2.89543 19 4V16C19 17.1046 18.1046 18 17 18H3C1.89543 18 1 17.1046 1 16V4C1 2.89543 1.89543 2 3 2Z" stroke="currentColor" strokeWidth="1.5"/>
-                <line x1="3" y1="7" x2="17" y2="7" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
-              <span>Bài viết</span>
-            </a>
-            <a href="#messages" className={`nav-item ${activeTab === 'messages' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('messages'); }}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M2 8C2 6.89543 2.89543 6 4 6H16C17.1046 6 18 6.89543 18 8V14C18 15.1046 17.1046 16 16 16H4C2.89543 16 2 15.1046 2 14V8Z" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M2 8L10 13L18 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <span>Tin nhắn</span>
-            </a>
-          </div>
-
-          <div className="nav-section">
-            <p className="nav-label">CÀI ĐẶT</p>
-            <a href="#settings" className="nav-item">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M10 3.5V2M10 18V16.5M16.5 10H18M2 10H3.5M14.5 14.5L15.8 15.8M4.2 4.2L5.5 5.5M14.5 5.5L15.8 4.2M5.5 15.8L4.2 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <span>Cài đặt</span>
-            </a>
-          </div>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="user-mini">
-            <div className="avatar">{userProfile?.username?.charAt(0).toUpperCase()}</div>
-            <div className="user-info">
-              <p>{userProfile?.username || 'User'}</p>
-              <span>Member</span>
-            </div>
-          </div>
-          <button className="logout-icon" onClick={handleLogout} title="Đăng xuất">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M7 2H14V16H7M11 7L6 12L11 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+    <div className="forum-shell">
+      <motion.header className="topbar" initial={{ y: -14, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+        <div>
+          <button className="topbar-brand" type="button" onClick={() => navigate('/forum/categories')}>
+            <h1>Stock Forum v1.02</h1>
           </button>
+          <p>{profileQuery.data?.username} • Forum member</p>
         </div>
-      </aside>
 
-      {/* Main Content */}
-      <div className="main-content">
-        {/* Header */}
-        <header className="header">
-          <div className="header-left">
-            <h1>Dashboard</h1>
-            <p className="subtitle">Quản lý trang web của bạn</p>
-          </div>
-          <div className="header-right">
-            <div className="search-box">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
-                <line x1="12.5" y1="12.5" x2="16" y2="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input type="text" placeholder="Tìm kiếm..." />
-            </div>
-            <button className="notification-btn">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M5 8C5 5.24 7.24 3 10 3C12.76 3 15 5.24 15 8C15 14 18 17 18 17H2C2 17 5 14 5 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="10" cy="18" r="1" fill="currentColor"/>
-              </svg>
-              <span className="badge">0</span>
-            </button>
-          </div>
-        </header>
-
-        {/* Content Grid */}
-        <div className="content">
-          {/* Welcome Card */}
-          <section className="welcome-section">
-            <div className="welcome-card">
-              <div className="welcome-header">
-                <div>
-                  <h2>Chào mừng trở lại!</h2>
-                  <p>Quản lý trang web Xenforo Clone của bạn</p>
-                </div>
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                  <circle cx="24" cy="24" r="22" stroke="url(#grad)" strokeWidth="2" opacity="0.3"/>
-                  <path d="M24 16V24L30 30" stroke="url(#grad)" strokeWidth="2" strokeLinecap="round" fill="none"/>
-                  <defs>
-                    <linearGradient id="grad" x1="0" y1="0" x2="48" y2="48">
-                      <stop offset="0%" stopColor="#00D9FF"/>
-                      <stop offset="100%" stopColor="#B26FFF"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-              {userProfile && (
-                <div className="user-profile-info">
-                  <div className="profile-item">
-                    <span className="label">Tên đăng nhập</span>
-                    <span className="value">{userProfile.username}</span>
-                  </div>
-                  <div className="divider"></div>
-                  <div className="profile-item">
-                    <span className="label">Email</span>
-                    <span className="value">{userProfile.email}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Stats Grid */}
-          <section className="metrics-grid">
-            <div className="metric-card">
-              <div className="metric-icon cyan">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 12C3 7.58 6.58 4 12 4C17.42 4 21 7.58 21 12C21 16.42 17.42 20 12 20C6.58 20 3 16.42 3 12Z" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M12 7V12L16 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <div className="metric-content">
-                <h3>Bài viết</h3>
-                <div className="metric-value">0</div>
-                <span className="metric-change">Bản nháp: 0</span>
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-icon purple">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M12 7V12L16 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <div className="metric-content">
-                <h3>Bình luận</h3>
-                <div className="metric-value">0</div>
-                <span className="metric-change">Chưa phê duyệt: 0</span>
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-icon cyan">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z" stroke="currentColor" strokeWidth="1.5"/>
-                  <circle cx="12" cy="12" r="2" fill="currentColor"/>
-                </svg>
-              </div>
-              <div className="metric-content">
-                <h3>Theo dõi</h3>
-                <div className="metric-value">0</div>
-                <span className="metric-change">Yêu cầu: 0</span>
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-icon purple">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                  <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" strokeWidth="1.5"/>
-                  <circle cx="10" cy="14.5" r="1" fill="currentColor"/>
-                </svg>
-              </div>
-              <div className="metric-content">
-                <h3>Hoạt động</h3>
-                <div className="metric-value">Hoạt</div>
-                <span className="metric-change">Online</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Activity Section */}
-          <section className="activity-section">
-            <div className="activity-card">
-              <h3>Hoạt động gần đây</h3>
-              <div className="activity-list">
-                <div className="activity-item">
-                  <div className="activity-icon info">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
-                      <path d="M8 5V8L10.5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                  <div className="activity-info">
-                    <p>Bạn đã đăng nhập</p>
-                    <span>Vừa xong</span>
-                  </div>
-                </div>
-                <div className="activity-item">
-                  <div className="activity-icon success">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M13.5 4L6 11.5L2.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <div className="activity-info">
-                    <p>Tài khoản được tạo</p>
-                    <span>Hôm nay</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="quick-actions">
-              <h3>Tác vụ nhanh</h3>
-              <div className="action-buttons">
-                <button className="action-btn">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M10 2V18M2 10H18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  Bài viết mới
-                </button>
-                <button className="action-btn">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M3 7H17C18.1046 7 19 7.89543 19 9V15C19 16.1046 18.1046 17 17 17H3C1.89543 17 1 16.1046 1 15V9C1 7.89543 1.89543 7 3 7Z" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M1 9L10 13L19 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  Gửi tin nhắn
-                </button>
-                <button className="action-btn">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M10 6V10L13 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  Lịch sử
-                </button>
-              </div>
-            </div>
-          </section>
+        <div className="topbar-right">
+          <div className="metric-chip"><TrendingUp size={14} /> {threads.length} topics</div>
+          <div className="metric-chip"><MessageCircle size={14} /> {posts.length} comments</div>
+          <button className="ghost-btn" onClick={handleLogout}><LogOut size={15} /> Đăng xuất</button>
         </div>
+      </motion.header>
+
+      <div className="forum-grid">
+        <section className="panel">
+          <div className="panel-head"><BarChart3 size={16} /><h2>Stock Categories</h2></div>
+          <form
+            className="stack-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createCategoryMutation.mutate({
+                name: newCategory.name.trim(),
+                description: newCategory.description.trim(),
+              });
+            }}
+          >
+            <input placeholder="Ticker: FPT, VNM..." value={newCategory.name} onChange={(e) => setNewCategory((old) => ({ ...old, name: e.target.value }))} required />
+            <input placeholder="Mô tả" value={newCategory.description} onChange={(e) => setNewCategory((old) => ({ ...old, description: e.target.value }))} />
+            <button type="submit" className="primary-btn" disabled={createCategoryMutation.isPending}>Tạo category</button>
+          </form>
+
+          {categoriesQuery.isError && <p className="empty-state">Không tải được category.</p>}
+          {!categories.length && !categoriesQuery.isError && (
+            <div className="empty-state-card">
+              <MoonStar size={16} />
+              <p>Chưa có category. Tạo mã đầu tiên để mở forum.</p>
+            </div>
+          )}
+
+          <ul className="list">
+            {categories.map((category) => (
+              <li key={category.id}>
+                <motion.button whileTap={{ scale: 0.98 }} className={`list-item ${selectedCategoryId === category.id ? 'active' : ''}`} onClick={() => { setSelectedCategoryId(category.id); setSelectedThreadId(null); }}>
+                  <div className="list-title">{category.name}</div>
+                  <div className="list-subtitle">{category.description || 'No description'}</div>
+                </motion.button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="panel">
+          <div className="panel-head"><Sparkles size={16} /><h2>Threads {selectedCategory ? `• ${selectedCategory.name}` : ''}</h2></div>
+          <form
+            className="stack-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createThreadMutation.mutate({ title: newThreadTitle.trim(), userName: forumUserName });
+            }}
+          >
+            <input placeholder="Tiêu đề topic" value={newThreadTitle} onChange={(e) => setNewThreadTitle(e.target.value)} required />
+            <button type="submit" className="primary-btn" disabled={!selectedCategoryId || !forumUserName || createThreadMutation.isPending}>Tạo thread</button>
+          </form>
+
+          {threadsQuery.isLoading && <div className="skeleton skeleton-list"></div>}
+          {!threadsQuery.isLoading && !threads.length && selectedCategoryId && <p className="empty-state">Category này chưa có topic.</p>}
+
+          <ul className="list">
+            {threads.map((thread) => (
+              <li key={thread.id}>
+                <motion.button
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.985 }}
+                  className={`list-item ${selectedThreadId === thread.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedThreadId(thread.id);
+                    increaseViewMutation.mutate(thread.id);
+                  }}
+                >
+                  <div className="list-title">{thread.title}</div>
+                  <div className="list-subtitle">
+                    by {thread.userName || 'unknown'} • {thread.viewCount} views • {new Date(thread.createdAt).toLocaleString()}
+                  </div>
+                </motion.button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="panel panel-wide">
+          <div className="panel-head"><MessageCircle size={16} /><h2>Comments {selectedThread ? `• ${selectedThread.title}` : ''}</h2></div>
+          <form
+            className="stack-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createCommentMutation.mutate({ content: newComment.trim(), userName: forumUserName });
+            }}
+          >
+            <textarea rows={4} placeholder="Để lại luận điểm, tín hiệu kỹ thuật, quản trị rủi ro..." value={newComment} onChange={(e) => setNewComment(e.target.value)} required />
+            <button type="submit" className="primary-btn" disabled={!selectedThreadId || !forumUserName || createCommentMutation.isPending}>Gửi comment</button>
+          </form>
+
+          {postsQuery.isLoading && <div className="skeleton skeleton-list"></div>}
+
+          {!postsQuery.isLoading && !posts.length && selectedThreadId && (
+            <div className="empty-state-card">
+              <MessageCircle size={16} />
+              <p>Chưa có comment nào. Bạn có thể mở đầu cuộc thảo luận.</p>
+            </div>
+          )}
+
+          {!selectedThreadId && <p className="empty-state">Chọn thread để xem và phản hồi bình luận.</p>}
+
+          <div className="comments-box">
+            <AnimatePresence>
+              {posts.map((post) => {
+                const summary = groupedReaction(post);
+                return (
+                  <motion.article
+                    key={post.id}
+                    className="comment-card"
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <p>{post.content}</p>
+                    <div className="meta-line">{post.userName || 'unknown'} • {new Date(post.createdAt).toLocaleString()}</div>
+                    <div className="reaction-row">
+                      {REACTION_TYPES.map((type) => {
+                        const isOwnPost = post.userName === forumUserName;
+                        return (
+                          <motion.button
+                            whileTap={{ scale: 0.92 }}
+                            key={`${post.id}-${type}`}
+                            className="tag-btn"
+                            disabled={isOwnPost}
+                            title={isOwnPost ? "Bạn không thể react bài của chính mình" : type}
+                            onClick={() => {
+                              if (!isOwnPost) {
+                                reactMutation.mutate({ postId: post.id, type });
+                              }
+                            }}
+                            style={{
+                              opacity: isOwnPost ? 0.5 : 1,
+                              cursor: isOwnPost ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            {type} {summary[type] ? `(${summary[type]})` : ''}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </motion.article>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </section>
       </div>
     </div>
   );

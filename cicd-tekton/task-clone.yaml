@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: task-clone
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: url
+      description: The URL of the GitHub repository
+    - name: branch
+      description: The branch to trigger the pipeline on
+    - name: revision
+      description: The revision to trigger the pipeline on
+  steps:
+    - name: clone
+      workingDir: $(workspaces.source.path)
+      image: alpine/git:v2.52.0
+      script: |
+        rm -rf * .[!.]* ..?* 2>/dev/null || true
+        BRANCH="$(params.branch)"
+        BRANCH="${BRANCH#refs/heads/}"
+        git clone --branch "${BRANCH}" "$(params.url)" .
+        git checkout "$(params.revision)"
+        ls -la

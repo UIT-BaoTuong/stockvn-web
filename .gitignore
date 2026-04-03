@@ -10,3 +10,14 @@ postgres/auth_data/
 # IDE files
 .vscode/
 .idea/
+secret-auth.yaml
+secret-forum.yaml
+seal-secret-auth.yaml 
+seal-secret-forum.yaml
+
+# 1. Chặn tất cả các file ở thư mục gốc
+/*
+
+# 2. Loại trừ (Cho phép) tất cả các thư mục ở gốc
+!/*/
+!/readme.md

@@ -1,7 +1,8 @@
+import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from './api';
-import './Register.css';
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { authClient } from './api';
 
 function Register() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ function Register() {
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -68,143 +70,113 @@ function Register() {
     }
 
     setLoading(true);
+    setSuccessMessage('');
     try {
-      await api.post('/auth/register', {
+      await authClient.register({
         username: formData.username,
         email: formData.email,
         password: formData.password
       });
-      alert('Đăng ký thành công! Vui lòng đăng nhập.');
-      navigate('/login');
+      setSuccessMessage('Đăng ký thành công. Bạn có thể đăng nhập ngay.');
+      toast.success('Đăng ký thành công');
+      setTimeout(() => navigate('/login'), 800);
     } catch (err) {
-      setErrors({
-        submit: err.response?.data?.message || 'Đăng ký thất bại'
-      });
+      const message = err.response?.data?.message || 'Đăng ký thất bại';
+      setErrors({ submit: message });
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      {/* Background Gradient */}
-      <div className="auth-bg"></div>
-
-      {/* Logo Area */}
-      <div className="auth-logo">
-        <svg width="48" height="48" viewBox="0 0 32 32" fill="none">
-          <rect x="2" y="2" width="10" height="10" stroke="url(#gradient1)" strokeWidth="1.5" rx="2"/>
-          <rect x="16" y="2" width="10" height="10" stroke="url(#gradient2)" strokeWidth="1.5" rx="2"/>
-          <rect x="2" y="16" width="10" height="10" stroke="url(#gradient2)" strokeWidth="1.5" rx="2"/>
-          <rect x="16" y="16" width="10" height="10" stroke="url(#gradient1)" strokeWidth="1.5" rx="2"/>
-          <defs>
-            <linearGradient id="gradient1" x1="0" y1="0" x2="12" y2="12">
-              <stop offset="0%" stopColor="#00D9FF"/>
-              <stop offset="100%" stopColor="#B26FFF"/>
-            </linearGradient>
-            <linearGradient id="gradient2" x1="0" y1="0" x2="12" y2="12">
-              <stop offset="0%" stopColor="#B26FFF"/>
-              <stop offset="100%" stopColor="#00D9FF"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <span>Xenforo</span>
-      </div>
-
-      <div className="auth-box register-box">
+    <div className="auth-shell">
+      <motion.div
+        className="auth-card"
+        initial={{ y: 16, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.35 }}
+      >
         <div className="auth-header">
-          <h1>Tạo Tài Khoản</h1>
-          <p>Tham gia cộng đồng của chúng tôi</p>
+          <h1>Tạo tài khoản</h1>
+          <p>Đăng ký để tham gia thảo luận chứng khoán</p>
         </div>
 
-        {errors.submit && (
-          <div className="error-message">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M8 4V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <circle cx="8" cy="12" r="0.5" fill="currentColor"/>
-            </svg>
-            {errors.submit}
-          </div>
-        )}
+        {errors.submit && <div className="alert error">{errors.submit}</div>}
+        {successMessage && <div className="alert success">{successMessage}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="username">Tên đăng nhập</label>
-            <input
-              id="username"
-              type="text"
-              name="username"
-              placeholder="Nhập tên đăng nhập"
-              value={formData.username}
-              onChange={handleChange}
-              className={errors.username ? 'input-error' : ''}
-            />
-            {errors.username && <span className="field-error">{errors.username}</span>}
-            <div className="input-focus"></div>
-          </div>
+          <label htmlFor="username">Tên đăng nhập</label>
+          <input
+            id="username"
+            type="text"
+            name="username"
+            placeholder="Tên đăng nhập"
+            value={formData.username}
+            onChange={handleChange}
+            className={errors.username ? 'input-error' : ''}
+          />
+          {errors.username && <span className="field-error">{errors.username}</span>}
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              name="email"
-              placeholder="Nhập email của bạn"
-              value={formData.email}
-              onChange={handleChange}
-              className={errors.email ? 'input-error' : ''}
-            />
-            {errors.email && <span className="field-error">{errors.email}</span>}
-            <div className="input-focus"></div>
-          </div>
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            placeholder="you@example.com"
+            value={formData.email}
+            onChange={handleChange}
+            className={errors.email ? 'input-error' : ''}
+          />
+          {errors.email && <span className="field-error">{errors.email}</span>}
 
-          <div className="form-group">
-            <label htmlFor="password">Mật khẩu</label>
-            <input
-              id="password"
-              type="password"
-              name="password"
-              placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
-              value={formData.password}
-              onChange={handleChange}
-              className={errors.password ? 'input-error' : ''}
-            />
-            {errors.password && <span className="field-error">{errors.password}</span>}
-            <div className="input-focus"></div>
-          </div>
+          <label htmlFor="password">Mật khẩu</label>
+          <input
+            id="password"
+            type="password"
+            name="password"
+            placeholder="Ít nhất 6 ký tự"
+            value={formData.password}
+            onChange={handleChange}
+            className={errors.password ? 'input-error' : ''}
+          />
+          {errors.password && <span className="field-error">{errors.password}</span>}
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Xác nhận mật khẩu</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              name="confirmPassword"
-              placeholder="Nhập lại mật khẩu"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              className={errors.confirmPassword ? 'input-error' : ''}
-            />
-            {errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}
-            <div className="input-focus"></div>
-          </div>
+          <label htmlFor="confirmPassword">Xác nhận mật khẩu</label>
+          <input
+            id="confirmPassword"
+            type="password"
+            name="confirmPassword"
+            placeholder="Nhập lại mật khẩu"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            className={errors.confirmPassword ? 'input-error' : ''}
+          />
+          {errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}
 
-          <button type="submit" disabled={loading} className="submit-btn">
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                Đang tạo tài khoản...
-              </>
-            ) : (
-              'Tạo Tài Khoản'
-            )}
+          <button type="submit" disabled={loading} className="primary-btn">
+            {loading ? 'Đang tạo tài khoản...' : 'Đăng ký'}
           </button>
         </form>
 
-        <div className="auth-footer">
-          <p>Đã có tài khoản? <a href="#signin" onClick={(e) => { e.preventDefault(); navigate('/login'); }}>Đăng nhập</a></p>
-        </div>
-      </div>
+        <p className="auth-footnote">
+          Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+        </p>
+      </motion.div>
+
+      <motion.aside
+        className="auth-side-info"
+        initial={{ x: 18, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.08 }}
+      >
+        <h2>Tư duy cộng đồng, kỷ luật dữ liệu</h2>
+        <ul>
+          <li>Theo dõi mã theo category</li>
+          <li>Phân tích kỹ thuật và cơ bản theo thread</li>
+          <li>Tương tác nhanh bằng reaction theo quan điểm</li>
+        </ul>
+      </motion.aside>
     </div>
   );
 }

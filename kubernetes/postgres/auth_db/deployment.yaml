@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-db
+  labels:
+    app: auth-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: auth-db
+  template:
+    metadata:
+      labels: 
+        app: auth-db
+    spec:
+      containers:
+        - name: auth-db
+          image: postgres:17-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: POSTGRES_DB
+          volumeMounts:
+            - name: pvc-auth-db
+              mountPath: /var/lib/postgresql/data
+              subPath: auth-db
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+      volumes:
+        - name: pvc-auth-db
+          persistentVolumeClaim:
+            claimName: pvc-auth-db

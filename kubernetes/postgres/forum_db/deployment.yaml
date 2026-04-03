@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forum-db
+  labels:
+    app: forum-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: forum-db
+  template:
+    metadata:
+      labels:
+        app: forum-db
+    spec:
+      containers:
+        - name: forum-db
+          image: postgres:17-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: forum-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: forum-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: forum-secret                  
+                  key: POSTGRES_DB
+          volumeMounts:
+            - name: pvc-forum-db
+              mountPath: /var/lib/postgresql/data
+              subPath: forum-db
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+      volumes:
+        - name: pvc-forum-db
+          persistentVolumeClaim:
+            claimName: pvc-forum-db 

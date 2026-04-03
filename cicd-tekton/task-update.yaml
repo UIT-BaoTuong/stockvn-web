@@ -1,0 +1,43 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: task-update
+spec:
+  workspaces:
+    - name: source
+      description: The source code workspace
+  params:
+    - name: url
+      description: The URL of the GitHub repository
+    - name: branch
+      description: The branch to trigger the pipeline on
+    - name: revision
+      description: The revision to trigger the pipeline on
+    - name: folders
+      description: Service name passed from the trigger
+  steps:
+    - name: update-manifest
+      workingDir: $(workspaces.source.path)
+      image: line/kubectl-kustomize:latest
+      script: |
+        cd kubernetes/$(params.folders)
+        kustomize edit set image docker.io/tuongndb1609/$(params.folders)=docker.io/tuongndb1609/$(params.folders):$(params.revision)
+
+    - name: git-push
+      image: alpine/git:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        export GIT_TERMINAL_PROMPT=0
+        git config --global user.email "23521750@gm.uit.edu.vn"
+        git config --global user.name "UIT-BaoTuong"
+        git add kubernetes/$(params.folders)/kustomization.yaml
+        
+        if git diff --staged --quiet; then
+          echo "No changes"
+        else
+          git commit -m "[CI] Update image"
+          repo_url="$(params.url)"
+          repo_url="${repo_url%.git}"
+          repo_path="${repo_url#https://github.com/}"
+          git push "${repo_path}.git" HEAD:$(params.branch) --force
+        fi

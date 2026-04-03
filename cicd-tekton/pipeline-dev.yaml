@@ -1,0 +1,78 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: pipeline-dev
+spec:
+  workspaces:
+    - name: source
+      description: A shared workspace for all tasks
+    - name: docker-config
+      description: Docker config workspace used for image push authentication
+  params:
+    - name: url
+      description: The URL of the GitHub repository
+    - name: branch
+      description: The branch to trigger the pipeline on
+    - name: revision
+      description: The revision to trigger the pipeline on
+    - name: folders
+      description: Comma-separated top-level folders passed from the TriggerBinding
+  tasks:
+    - name: task-clone
+      taskRef:
+        name: task-clone
+      workspaces:
+        - name: source
+          workspace: source
+      params:
+        - name: url
+          value: $(params.url)
+        - name: branch
+          value: $(params.branch)
+        - name: revision
+          value: $(params.revision)
+    - name: task-test
+      runAfter: ["task-clone"]
+      taskRef:
+        name: task-test
+      params:
+        - name: url
+          value: $(params.url)
+        - name: branch
+          value: $(params.branch)
+        - name: revision
+          value: $(params.revision)
+    - name: task-build-push
+      runAfter: ["task-test"]
+      taskRef:
+        name: task-build-push
+      workspaces:
+        - name: source
+          workspace: source
+        - name: docker-config
+          workspace: docker-config
+      params:
+        - name: url
+          value: $(params.url)
+        - name: branch
+          value: $(params.branch)
+        - name: revision
+          value: $(params.revision)
+        - name: folders
+          value: $(params.folders)
+    - name: task-update
+      runAfter: ["task-build-push"]
+      taskRef:
+        name: task-update
+      workspaces:
+        - name: source
+          workspace: source
+      params:
+        - name: url
+          value: $(params.url)
+        - name: branch
+          value: $(params.branch)
+        - name: revision
+          value: $(params.revision)
+        - name: folders
+          value: $(params.folders)

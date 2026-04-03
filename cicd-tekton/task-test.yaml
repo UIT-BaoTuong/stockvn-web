@@ -1,0 +1,16 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: task-test
+spec:
+  params:
+    - name: url
+      description: The URL of the GitHub repository
+    - name: branch
+      description: The branch to trigger the pipeline on
+    - name: revision
+      description: The revision to trigger the pipeline on
+  steps:
+    - name: test
+      image: alpine:latest
+      script: echo "Test $(params.url) on branch $(params.branch) at revision $(params.revision)"
