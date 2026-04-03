@@ -231,7 +231,7 @@ function Dashboard() {
       <motion.header className="topbar" initial={{ y: -14, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
         <div>
           <button className="topbar-brand" type="button" onClick={() => navigate('/forum/categories')}>
-            <h1>Stock Forum v1.01</h1>
+            <h1>Stock Forum v1.02</h1>
           </button>
           <p>{profileQuery.data?.username} • Forum member</p>
         </div>
