@@ -15,6 +15,24 @@
 - Monitoring: Prometheus + Grafana
 - Ingress/SSL: NGINX Ingress + TLS secret
 
+## Security
+- TLS/HTTPS is enabled at NGINX Ingress with forced SSL redirect.
+- Domain certificates are served through Kubernetes TLS secret: stockvn-tls-secret.
+- Sensitive runtime configuration is injected using Kubernetes Secrets.
+- Encrypted secret workflow is available via Sealed Secrets for Git-safe secret storage.
+- Current status: cert-manager is not yet integrated; certificate lifecycle is managed manually.
+
+## Networking and Endpoints
+| Service | URL |
+| :--- | :--- |
+| Main App | https://stockvn.online |
+| Main App (www) | https://www.stockvn.online |
+| ArgoCD | https://cd.stockvn.online |
+| Monitoring (Grafana) | https://monitor.stockvn.online |
+| Tekton Dashboard | https://tekton.stockvn.online |
+| Kubernetes Dashboard | https://dashboard.stockvn.online |
+| Tekton Webhook Listener | https://webhook.stockvn.online |
+
 ## CI/CD Flow
 
 This diagram represents the full infrastructure + CI/CD + delivery workflow:
@@ -48,13 +66,13 @@ This diagram represents the full infrastructure + CI/CD + delivery workflow:
 - Practical observability stack with Prometheus and Grafana.
 - Cloud + platform bootstrap flow is documented (Terraform + Ansible + AKS).
 
-## Pipeline Weaknesses
-- Test stage is still lightweight and should include real unit/integration checks as a hard gate.
-- Security gates are not fully integrated yet (SAST, dependency scanning, image CVE scanning, signing/SBOM).
-- Environment promotion strategy can be improved (dev -> staging -> production approvals).
-- Access control can be tightened further with least-privilege RBAC and scoped service accounts.
-- Some workflows still rely on direct manifest updates; PR-based manifest promotion would be safer.
-- Reliability controls can be expanded (rollback automation, release strategy, stricter quality policies).
+## Upcoming Improvements
+- Replace placeholder test steps with mandatory unit/integration test gates.
+- Integrate security gates:dependency scanning, container CVE scanning, image signing.
+- Implement environment promotion flow (dev -> staging -> production) with approvals.
+- Add progressive delivery strategy (canary/blue-green) using Argo Rollouts or Istio.
+- Centralized Secret Management
+- Automated Certificate Management
 
 ## Tekton Dashboard
 This dashboard is used to track CI/CD pipelines. You can inspect pipeline runs, task runs, step logs for build/test/deploy, and debug failed executions.
