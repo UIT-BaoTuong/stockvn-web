@@ -8,4 +8,4 @@ resources:
 images:
 - name: docker.io/tuongndb1609/frontend
   newName: docker.io/tuongndb1609/frontend
-  newTag: 50b91efaaf4fc233afb7bd63e2995919e05fa1e1
+  newTag: 71836ef44f9440ccba6f22a48a8c7557d0d68df5
