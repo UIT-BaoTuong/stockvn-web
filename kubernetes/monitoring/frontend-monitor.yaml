@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: frontend-monitor
+  labels:
+    release: monitoring-stack
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+  endpoints:
+    - port: http # Nhớ dặn Tường đặt tên port là 'http'
+      path: /stub_status
+      interval: 15s
