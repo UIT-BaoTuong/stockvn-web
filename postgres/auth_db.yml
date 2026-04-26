@@ -13,3 +13,15 @@ services:
       - "5433:5432"
     volumes:
       - ./auth_data:/var/lib/postgresql/data
+
+  auth-db-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: auth-db-exporter
+    restart: always
+    environment:
+      # Cấu hình chuỗi kết nối chọc thẳng vào auth-db ở trên
+      DATA_SOURCE_NAME: "postgresql://postgres:Aa123456@auth-db:5432/auth_db?sslmode=disable"
+    ports:
+      - "9187:9187" # Mở cổng 9187 cho Prometheus cào
+    depends_on:
+      - auth-db
