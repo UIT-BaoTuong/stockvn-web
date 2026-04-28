@@ -15,6 +15,7 @@ spec:
         app: forum-db
     spec:
       containers:
+        # --- CONTAINER 1: DATABASE CỦA DEV ---
         - name: forum-db
           image: postgres:17-alpine
           ports:
@@ -46,7 +47,32 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "1"
+
+        # --- CONTAINER 2: SIDECAR EXPORTER CỦA SRE ---
+        - name: forum-db-exporter
+          image: prometheuscommunity/postgres-exporter
+          ports:
+            - containerPort: 9187
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: forum-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: forum-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: forum-secret
+                  key: POSTGRES_DB
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB)?sslmode=disable"
+
       volumes:
         - name: pvc-forum-db
           persistentVolumeClaim:
-            claimName: pvc-forum-db 
+            claimName: pvc-forum-db

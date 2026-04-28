@@ -9,6 +9,6 @@ spec:
     matchLabels:
       app: frontend
   endpoints:
-    - port: http # Nhớ dặn Tường đặt tên port là 'http'
+    - port: http 
       path: /stub_status
       interval: 15s
