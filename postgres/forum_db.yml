@@ -13,3 +13,14 @@ services:
       - "5434:5432"
     volumes:
       - ./forum_data:/var/lib/postgresql/data
+  
+  forum-db-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: forum-db-exporter
+    restart: always
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:Aa123456@forum-db:5432/forum_db?sslmode=disable"
+    ports:
+      - "9188:9187" 
+    depends_on:
+      - forum-db

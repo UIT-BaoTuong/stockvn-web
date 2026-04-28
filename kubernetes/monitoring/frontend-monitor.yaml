@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: frontend-monitor
+  labels:
+    release: monitoring-stack
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+  endpoints:
+    - port: metrics 
+      path: /metrics
+      interval: 15s

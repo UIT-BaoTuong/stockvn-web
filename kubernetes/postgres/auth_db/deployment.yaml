@@ -17,6 +17,7 @@ spec:
         app: auth-db
     spec:
       containers:
+        # --- CONTAINER 1: DATABASE CỦA DEV ---
         - name: auth-db
           image: postgres:17-alpine
           ports:
@@ -48,6 +49,33 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "1"
+
+        # --- CONTAINER 2: SIDECAR EXPORTER CỦA SRE ---
+        - name: auth-db-exporter
+          image: prometheuscommunity/postgres-exporter
+          ports:
+            - containerPort: 9187
+          env:
+            # Lấy lại các biến Secret để Exporter dùng ké
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: POSTGRES_DB
+            # Nối chuỗi tự động cấu hình URL
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB)?sslmode=disable"
+
       volumes:
         - name: pvc-auth-db
           persistentVolumeClaim:
