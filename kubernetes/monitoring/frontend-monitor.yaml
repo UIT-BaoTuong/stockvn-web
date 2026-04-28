@@ -9,6 +9,6 @@ spec:
     matchLabels:
       app: frontend
   endpoints:
-    - port: http 
-      path: /stub_status
+    - port: metrics 
+      path: /metrics
       interval: 15s
